@@ -59,6 +59,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
+#define DT_Pin GPIO_PIN_8
+#define DT_GPIO_Port GPIOB
+#define SCK_Pin GPIO_PIN_9
+#define SCK_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

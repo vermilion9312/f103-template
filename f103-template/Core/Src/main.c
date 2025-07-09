@@ -40,6 +40,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
@@ -51,6 +53,7 @@ static uint8_t buffer[10];
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -58,7 +61,64 @@ static void MX_NVIC_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define DT_PIN GPIO_PIN_8
+#define DT_PORT GPIOB
+#define SCK_PIN GPIO_PIN_9
+#define SCK_PORT GPIOB
 
+uint32_t tare = 0;
+float knownOriginal = 1;  // in milli gram
+float knownHX711 = 1;
+int weight;
+
+void microDelay(uint16_t delay)
+{
+  __HAL_TIM_SET_COUNTER(&htim2, 0);
+  while (__HAL_TIM_GET_COUNTER(&htim2) < delay);
+}
+
+int32_t getHX711(void)
+{
+  uint32_t data = 0;
+  uint32_t startTime = HAL_GetTick();
+  while(HAL_GPIO_ReadPin(DT_PORT, DT_PIN) == GPIO_PIN_SET)
+  {
+    if(HAL_GetTick() - startTime > 200)
+      return 0;
+  }
+  for(int8_t len=0; len<24 ; len++)
+  {
+    HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
+    microDelay(1);
+    data = data << 1;
+    HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
+    microDelay(1);
+    if(HAL_GPIO_ReadPin(DT_PORT, DT_PIN) == GPIO_PIN_SET)
+      data ++;
+  }
+  data = data ^ 0x800000;
+  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
+  microDelay(1);
+  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
+  microDelay(1);
+  return data;
+}
+
+int weigh()
+{
+  int32_t  total = 0;
+  int32_t  samples = 50;
+  int milligram;
+  float coefficient;
+  for(uint16_t i=0 ; i<samples ; i++)
+  {
+      total += getHX711();
+  }
+  int32_t average = (int32_t)(total / samples);
+  coefficient = knownOriginal / knownHX711;
+  milligram = (int)(average-tare)*coefficient;
+  return milligram;
+}
 /* USER CODE END 0 */
 
 /**
@@ -91,11 +151,16 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_Base_Start(&htim2);
+  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
+  HAL_Delay(10);
+  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
+  HAL_Delay(10);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,8 +171,9 @@ int main(void)
   {
 
 //	  HAL_UART_Transmit(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"), 10);
-	  HAL_UART_Transmit_IT(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"));
-	  HAL_Delay(100);
+//	  HAL_UART_Transmit_IT(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"));
+//	  HAL_Delay(500);
+	  weight = weigh();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -165,6 +231,51 @@ static void MX_NVIC_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 64 - 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -217,12 +328,28 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SCK_GPIO_Port, SCK_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DT_Pin */
+  GPIO_InitStruct.Pin = DT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(DT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SCK_Pin */
+  GPIO_InitStruct.Pin = SCK_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SCK_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
