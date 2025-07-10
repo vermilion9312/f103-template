@@ -173,7 +173,9 @@ int main(void)
 //	  HAL_UART_Transmit(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"), 10);
 //	  HAL_UART_Transmit_IT(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"));
 //	  HAL_Delay(500);
-	  weight = weigh();
+//	  weight = weigh();
+	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
