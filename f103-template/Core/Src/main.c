@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,8 +47,9 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static uint8_t data;
-static uint8_t buffer[10];
+static bool last_state;
+static bool state;
+static uint8_t led_state;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,64 +64,7 @@ static void MX_NVIC_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define DT_PIN GPIO_PIN_8
-#define DT_PORT GPIOB
-#define SCK_PIN GPIO_PIN_9
-#define SCK_PORT GPIOB
 
-uint32_t tare = 0;
-float knownOriginal = 1;  // in milli gram
-float knownHX711 = 1;
-int weight;
-
-void microDelay(uint16_t delay)
-{
-  __HAL_TIM_SET_COUNTER(&htim2, 0);
-  while (__HAL_TIM_GET_COUNTER(&htim2) < delay);
-}
-
-int32_t getHX711(void)
-{
-  uint32_t data = 0;
-  uint32_t startTime = HAL_GetTick();
-  while(HAL_GPIO_ReadPin(DT_PORT, DT_PIN) == GPIO_PIN_SET)
-  {
-    if(HAL_GetTick() - startTime > 200)
-      return 0;
-  }
-  for(int8_t len=0; len<24 ; len++)
-  {
-    HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
-    microDelay(1);
-    data = data << 1;
-    HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
-    microDelay(1);
-    if(HAL_GPIO_ReadPin(DT_PORT, DT_PIN) == GPIO_PIN_SET)
-      data ++;
-  }
-  data = data ^ 0x800000;
-  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
-  microDelay(1);
-  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
-  microDelay(1);
-  return data;
-}
-
-int weigh()
-{
-  int32_t  total = 0;
-  int32_t  samples = 50;
-  int milligram;
-  float coefficient;
-  for(uint16_t i=0 ; i<samples ; i++)
-  {
-      total += getHX711();
-  }
-  int32_t average = (int32_t)(total / samples);
-  coefficient = knownOriginal / knownHX711;
-  milligram = (int)(average-tare)*coefficient;
-  return milligram;
-}
 /* USER CODE END 0 */
 
 /**
@@ -157,25 +103,75 @@ int main(void)
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim2);
-  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_SET);
-  HAL_Delay(10);
-  HAL_GPIO_WritePin(SCK_PORT, SCK_PIN, GPIO_PIN_RESET);
-  HAL_Delay(10);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 //  HAL_UART_Receive_IT(&huart1, buffer, sizeof(buffer));
-  HAL_UARTEx_ReceiveToIdle_IT(&huart1, buffer, sizeof(buffer));
+
+
+
   while (1)
   {
 
-//	  HAL_UART_Transmit(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"), 10);
-//	  HAL_UART_Transmit_IT(&huart1, (uint8_t*) "Hello\r\n", strlen("Hello\r\n"));
-//	  HAL_Delay(500);
-//	  weight = weigh();
-	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-	  HAL_Delay(1000);
+	 last_state = state;
+	 state = HAL_GPIO_ReadPin(BUTTON_GPIO_Port, BUTTON_Pin);
+
+	 if (led_state == 0)
+	 {
+		 static uint32_t last_tick;
+
+		 if (last_tick == 0) last_tick = HAL_GetTick();
+		 if (HAL_GetTick() - last_tick > 2000)
+		 {
+			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			 last_tick = 0;
+		 }
+
+		 if (last_state && !state)
+		 {
+			 led_state = 2;
+		 }
+
+	 }
+	 else if (led_state == 1)
+	 {
+		 static uint32_t last_tick;
+
+		 if (last_tick == 0) last_tick = HAL_GetTick();
+		 if (HAL_GetTick() - last_tick > 1000)
+		 {
+			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			 last_tick = 0;
+		 }
+
+		 if (last_state && !state)
+		 {
+			 led_state = 2;
+		 }
+	 }
+	 else if (led_state == 2)
+	 {
+		 static uint32_t last_tick;
+
+		 if (last_tick == 0) last_tick = HAL_GetTick();
+		 if (HAL_GetTick() - last_tick > 100)
+		 {
+			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			 last_tick = 0;
+		 }
+
+		 if (last_state && !state)
+		 {
+			 led_state = 0;
+		 }
+	 }
+
+	 HAL_Delay(10);
+
+
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -340,6 +336,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : BUTTON_Pin */
+  GPIO_InitStruct.Pin = BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BUTTON_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : DT_Pin */
   GPIO_InitStruct.Pin = DT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -359,12 +361,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	static bool is_presed;
+
+	if (GPIO_Pin == BUTTON_Pin)
+	{
+
+	}
+}
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart->Instance == USART1)
 	{
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		HAL_UARTEx_ReceiveToIdle_IT(&huart1, buffer, sizeof(buffer));
+
 	}
 }
 
@@ -372,8 +382,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART1)
 	{
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		HAL_UARTEx_ReceiveToIdle_IT(&huart1, buffer, sizeof(buffer));
+
 	}
 }
 
