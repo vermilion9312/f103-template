@@ -21,9 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <output.hpp>
+#include <input.hpp>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,9 +46,7 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static bool last_state;
-static bool state;
-static uint8_t led_state;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,66 +108,25 @@ int main(void)
 
 
 
+  Input button(BUTTON_GPIO_Port, BUTTON_Pin, InputType::NORMAL_CLOSE);
+  Output led(LED_GPIO_Port, LED_Pin, OutputType::ACTIVE_LOW);
+
+
   while (1)
   {
+//	  button.update();
 
-	 last_state = state;
-	 state = HAL_GPIO_ReadPin(BUTTON_GPIO_Port, BUTTON_Pin);
+	  if (HAL_GPIO_ReadPin(BUTTON_GPIO_Port, BUTTON_Pin))
+	  {
+		  HAL_GPIO_
+	  }
+	  else
+	  {
+		  led.turn_off();
+	  }
 
-	 if (led_state == 0)
-	 {
-		 static uint32_t last_tick;
-
-		 if (last_tick == 0) last_tick = HAL_GetTick();
-		 if (HAL_GetTick() - last_tick > 2000)
-		 {
-			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			 last_tick = 0;
-		 }
-
-		 if (last_state && !state)
-		 {
-			 led_state = 2;
-		 }
-
-	 }
-	 else if (led_state == 1)
-	 {
-		 static uint32_t last_tick;
-
-		 if (last_tick == 0) last_tick = HAL_GetTick();
-		 if (HAL_GetTick() - last_tick > 1000)
-		 {
-			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			 last_tick = 0;
-		 }
-
-		 if (last_state && !state)
-		 {
-			 led_state = 2;
-		 }
-	 }
-	 else if (led_state == 2)
-	 {
-		 static uint32_t last_tick;
-
-		 if (last_tick == 0) last_tick = HAL_GetTick();
-		 if (HAL_GetTick() - last_tick > 100)
-		 {
-			 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			 last_tick = 0;
-		 }
-
-		 if (last_state && !state)
-		 {
-			 led_state = 0;
-		 }
-	 }
-
-	 HAL_Delay(10);
-
-
-
+//	  led.toggle();
+//	  HAL_Delay(100);
 
     /* USER CODE END WHILE */
 
@@ -363,7 +319,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	static bool is_presed;
 
 	if (GPIO_Pin == BUTTON_Pin)
 	{
