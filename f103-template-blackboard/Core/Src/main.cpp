@@ -116,14 +116,6 @@ int main(void)
   {
 //	  button.update();
 
-	  if (HAL_GPIO_ReadPin(BUTTON_GPIO_Port, BUTTON_Pin))
-	  {
-		  HAL_GPIO_
-	  }
-	  else
-	  {
-		  led.turn_off();
-	  }
 
 //	  led.toggle();
 //	  HAL_Delay(100);
